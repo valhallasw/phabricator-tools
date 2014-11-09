@@ -146,3 +146,8 @@ Class['phabricator']   <- Class['apache2']
 Class['phabricator']   <- Class['otherpackages']
 Class['phabricator']   <- Class['phabricatordirs']
 Class['phabricatordb'] <- Class['phabricator']
+
+file { "/etc/profile.d/usevim.sh":
+    ensure => present,
+    content => "EDITOR=vim",
+}
