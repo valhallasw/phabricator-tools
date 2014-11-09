@@ -65,6 +65,7 @@ class phabricatordirs {
     # it does automatically create them in the correct order though
     file { "/phabricator/instances/dev":
         ensure => directory,
+        owner => 'vagrant',
     }
     file { "/phabricator/instances":
         ensure => directory,
@@ -76,20 +77,35 @@ class phabricatordirs {
 
 class phabricator {
 
-    define phabgithubunzip ($repo = $title, $commit) {
+    define phabgithubunzip ($repo = $title) {
         $proxy_string = "https_proxy=${https_proxy}"
         $github_string = "https://github.com/facebook"
-        exec { "wget ${github_string}/${repo}/archive/${commit}.zip -O ${dev_dir}/${repo}.zip --no-check-certificate && unzip ${dev_dir}/${repo}.zip -d ${dev_dir} && mv ${dev_dir}/${repo}-${commit} ${dev_dir}/${repo}":
+        exec { "git clone ${github_string}/${repo} ${dev_dir}/${repo}":
             path        => $std_path,
             creates     => "${dev_dir}/${repo}",
             environment => $proxy_string,
+            require => Package['git-core'],
+            user => 'vagrant',
         }
     }
 
     # set 'commit' to 'master' for the latest version
-    phabgithubunzip {'phabricator': commit => 'df8474d778048a7364b2e332a1e4cae55d93291e'}
-    phabgithubunzip {'libphutil': commit => '0b9f193303dfae4f9204d8f577e2bd45acd4963f'}
-    phabgithubunzip {'arcanist': commit => '42ae7cd92f92e026bdd604e659d2bc23e9352baa'}
+    phabgithubunzip {'phabricator':}
+    phabgithubunzip {'libphutil':}
+    phabgithubunzip {'arcanist':
+        require => [File["/etc/profile.d/arcanist.sh"],
+                    Exec["${dev_dir}/libphutil/scripts/build_xhpast.sh"]],
+    }
+    
+    file { "/etc/profile.d/arcanist.sh":
+        ensure => present,
+        content => "# expose 'arc' command\nexport PATH=\$PATH:${dev_dir}/arcanist/bin\nsource ${dev_dir}/arcanist/resources/shell/bash-completion\n",
+    }
+    
+    exec { "${dev_dir}/libphutil/scripts/build_xhpast.sh":
+      creates => "${dev_dir}/libphutil/support/xhpast/xhpast",
+      require => Phabgithubunzip['libphutil'],
+    }
 }
 
 class phabricatordb {
